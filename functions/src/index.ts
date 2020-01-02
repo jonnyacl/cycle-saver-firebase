@@ -1,8 +1,47 @@
-import * as functions from 'firebase-functions';
+import * as express from "express";
+import * as functions from "firebase-functions";
+import * as admin from "firebase-admin";
+import { stravaSignIn } from "./strava";
+admin.initializeApp();
 
-// // Start writing Firebase Functions
-// // https://firebase.google.com/docs/functions/typescript
-//
-// export const helloWorld = functions.https.onRequest((request, response) => {
-//  response.send("Hello from Firebase!");
-// });
+const cors = require('cors')({ origin: true });
+const app = express();
+
+const validateFirebaseIdToken = async (req: express.Request, res: express.Response, next: Function) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('No Firebase ID token was passed as a Bearer token in the Authorization header.',
+        'Make sure you authorize your request by providing the following HTTP header:',
+        'Authorization: Bearer <Firebase ID Token>');
+    res.status(401).send('Unauthorized');
+    return;
+  }
+
+  const idToken = authHeader.split('Bearer ')[1];
+
+  try {
+    await admin.auth().verifyIdToken(idToken);
+    next();
+    return;
+  } catch (error) {
+    console.error('Error while verifying Firebase ID token:', error);
+    res.status(401).send('Unauthorized');
+    return;
+  }
+};
+
+const logRoute = async (req: express.Request, res: express.Response, next: Function) => {
+  console.log(`REQ: ${req.baseUrl}${req.path}`);
+  next();
+  return;
+};
+
+app.use(cors);
+app.use(logRoute);
+app.use(validateFirebaseIdToken);
+
+app.get("/strava/login", (req, resp) => {
+    stravaSignIn(req, resp);
+});
+
+exports.app = functions.https.onRequest(app);
