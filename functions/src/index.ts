@@ -5,6 +5,7 @@ import { stravaSignIn } from "./strava";
 admin.initializeApp();
 
 const cors = require('cors')({ origin: true });
+
 const app = express();
 
 const validateFirebaseIdToken = async (req: express.Request, res: express.Response, next: Function) => {
@@ -39,8 +40,9 @@ const logRoute = async (req: express.Request, res: express.Response, next: Funct
 app.use(cors);
 app.use(logRoute);
 app.use(validateFirebaseIdToken);
+app.use(express.json());
 
-app.get("/strava/login", (req, resp) => {
+app.post("/strava/oauth", (req, resp) => {
     stravaSignIn(req, resp);
 });
 
