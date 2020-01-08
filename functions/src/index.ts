@@ -1,7 +1,7 @@
 import * as express from "express";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { stravaSignIn } from "./strava";
+import { stravaSignIn, stravaToken } from "./strava";
 admin.initializeApp();
 
 const cors = require('cors')({ origin: true });
@@ -43,7 +43,11 @@ app.use(validateFirebaseIdToken);
 app.use(express.json());
 
 app.post("/strava/oauth", (req, resp) => {
-    stravaSignIn(req, resp);
+  stravaSignIn(req, resp);
+});
+
+app.post("/strava/token", (req, resp) => {
+  stravaToken(req, resp);
 });
 
 exports.app = functions.https.onRequest(app);
