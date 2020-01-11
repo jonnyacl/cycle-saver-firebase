@@ -46,8 +46,16 @@ app.post("/strava/oauth", (req, resp) => {
   stravaSignIn(req, resp);
 });
 
-app.post("/strava/token", (req, resp) => {
-  stravaToken(req, resp);
+app.post("/strava/token", async (req, resp) => {
+  await stravaToken(req, resp);
+});
+
+app.get("/strava/athlete/:user", async (req, resp) => {
+  await stravaToken(req, resp);
+});
+
+app.get("/strava/athlete/:user/activities", async (req, resp) => {
+  await stravaToken(req, resp);
 });
 
 exports.app = functions.https.onRequest(app);
