@@ -16,7 +16,6 @@ export const stravaSignIn = (req: express.Request, resp: express.Response): expr
                 resp.status(201);
                 return resp.json({ "url": `${config.strava.signinUrl}?client_id=${config.strava.clientId}&response_type=code&redirect_uri=${config.app.redirect}&scope=read&approval_prompt=force` });
             default:
-                resp.status(400);
                 break;
         }
     }
@@ -43,10 +42,15 @@ export const stravaToken = async (req: express.Request, resp: express.Response):
         const stravaResp = await axios.post(tokenUrl, stravaBody);
         if (stravaResp.status === 200 || stravaResp.status === 201) {
             // store token and async request the athlete's profile and activities
+            console.log(`Strava token: ${stravaResp}`);
             storeData("token", { type: "strava", token: stravaResp.data.access_token, user_id: body.user_id });
-            fetchAthleteData(stravaResp.data.access_token);
-            resp.status(201);
-            return Promise.resolve(resp.json({}));
+            fetchStoreAthlete(stravaResp.data.access_token).then(athlete => {
+                resp.status(201);
+                return Promise.resolve(resp.json(athlete));
+            }).catch(() => {
+                resp.status(502);
+                return Promise.resolve({ "error": "Failed to obtain token" });
+            });
         } else {
             resp.status(stravaResp.status);
             return Promise.resolve(resp.json({ "error": "Failed to obtain token" }));
@@ -82,21 +86,27 @@ export const getAthleteActivities = async (req: express.Request, resp: express.R
     }
 };
 
-const fetchAthleteData = (stravaToken: string, user_id?: string) => {
+const fetchStoreAthlete = (stravaToken: string, user_id?: string): Promise<any> => {
     if (!user_id) {
         user_id = setUserId(stravaToken);
     }
     const athleteUrl = `${config.strava.apiUrl}athlete`;
-    axios.get(athleteUrl, { headers: { Authorization: `Bearer ${stravaToken}` }}).then(resp => {
-        // store resp
-        storeData("athlete", { athlete: resp.data, user_id });
-        fetchAthleteActivites(stravaToken);
-    }).catch(e => {
-        console.error(`Failed to fetch athlete data: ${e.message}`);
+    return new Promise((resolve, reject) => {
+        axios.get(athleteUrl, { headers: { Authorization: `Bearer ${stravaToken}` }}).then(resp => {
+            // store resp
+            console.log(`Athlete: ${JSON.stringify(resp.data)}`);
+            const athlete = { athlete: resp.data, user_id };
+            storeData("athlete", athlete);
+            downloadAthleteActivites(stravaToken);
+            resolve(athlete);
+        }).catch(e => {
+            console.error(`Failed to fetch athlete data: ${e.message}`);
+            reject(e);
+        });
     });
 };
 
-const fetchAthleteActivites = (stravaToken: string, since?: moment.Moment, user_id?: string) => {
+const downloadAthleteActivites = (stravaToken: string, since?: moment.Moment, user_id?: string) => {
     if (!user_id) {
         user_id = setUserId(stravaToken);
     }
@@ -106,7 +116,6 @@ const fetchAthleteActivites = (stravaToken: string, since?: moment.Moment, user_
             activityUrl = `${activityUrl}?after=${since.toISOString()}`;
         }
         axios.get(activityUrl, { headers: { Authorization: `Bearer ${stravaToken}` }}).then(resp => {
-            // store resp
             resp.data.forEach((activity: any) => {
                 storeData("activity", { activity, user_id });
             });
