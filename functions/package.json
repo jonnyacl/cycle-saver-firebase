@@ -14,7 +14,7 @@
     "typescript": "^3.2.2",
     "firebase-functions-test": "^0.1.6",
     "prompt": "^1.0.0",
-    "minimist": ">=0.2.1"
+    "minimist": ">=1.2.3"
   },
   "scripts": {
     "lint": "tslint --project tsconfig.json",
