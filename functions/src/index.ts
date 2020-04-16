@@ -2,6 +2,7 @@ import * as express from "express";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { stravaSignIn, obtainStravaToken } from "./strava";
+import { getAthlete, getActivities } from "./user";
 admin.initializeApp();
 
 const cors = require('cors')({ origin: true });
@@ -32,7 +33,7 @@ const validateFirebaseIdToken = async (req: express.Request, res: express.Respon
 };
 
 const logRoute = async (req: express.Request, res: express.Response, next: Function) => {
-  console.log(`REQ: ${req.baseUrl}${req.path}`);
+  console.log('REQ =>', req.params);
   next();
   return;
 };
@@ -50,12 +51,12 @@ app.post("/strava/token", async (req, resp) => {
   await obtainStravaToken(req, resp);
 });
 
-app.get("/strava/athlete/:user", async (req, resp) => {
-  await obtainStravaToken(req, resp);
+app.get("/:user/athletes", async (req, resp) => {
+  await getAthlete(req, resp);
 });
 
-app.get("/strava/athlete/:user/activities", async (req, resp) => {
-  await obtainStravaToken(req, resp);
+app.get("/:user/activities", async (req, resp) => {
+  await getActivities(req, resp);
 });
 
 exports.app = functions.https.onRequest(app);

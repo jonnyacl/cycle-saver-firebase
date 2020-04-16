@@ -2,7 +2,7 @@ import * as express from "express";
 import config from "./config";
 import axios from "axios";
 import * as moment from "moment";
-import { getData } from "./data";
+import { storeUserData, storeStravaToken } from "./data";
 
 export const stravaSignIn = (req: express.Request, resp: express.Response): express.Response => {
     const body = req.body;
@@ -27,6 +27,7 @@ export const obtainStravaToken = async (req: express.Request, resp: express.Resp
     const body = req.body;
     resp.setHeader("Content-Type", "application/json");
     if (!body.user_id) {
+        console.error(`Missing user id in body ${JSON.stringify(body)}`);
         resp.status(400);
         return Promise.resolve(resp.json({ "error": "Missing user id" }));
     }
@@ -42,16 +43,18 @@ export const obtainStravaToken = async (req: express.Request, resp: express.Resp
         const stravaResp = await axios.post(tokenUrl, stravaBody);
         if (stravaResp.status === 200 || stravaResp.status === 201) {
             // store token and async request the athlete's profile and activities
-            console.log(`Strava token: ${stravaResp}`);
-            // storeData("token", { type: "strava", token: stravaResp.data.access_token, user_id: body.user_id });
-            fetchStoreAthlete(stravaResp.data.access_token).then(athlete => {
+            console.log(`Strava token: ${JSON.stringify(stravaResp)}`);
+            await storeStravaToken(body.user_id, stravaResp.data);
+            fetchAndStoreAthlete(stravaResp.data.access_token, body.user_id).then(athlete => {
                 resp.status(201);
                 return Promise.resolve(resp.json(athlete));
-            }).catch(() => {
-                resp.status(502);
-                return Promise.resolve({ "error": "Failed to obtain token" });
+            }).catch(e => {
+                console.error("Failed to fetch athlete data", e);
+                resp.status(500);
+                return Promise.resolve({ "error": "Failed to fetch athlete data" });
             });
         } else {
+            console.error("Failed to obtain strava token", stravaResp);
             resp.status(stravaResp.status);
             return Promise.resolve(resp.json({ "error": "Failed to obtain token" }));
         }
@@ -60,46 +63,20 @@ export const obtainStravaToken = async (req: express.Request, resp: express.Resp
     return Promise.resolve(resp.json({ "error": "Missing token" }));
 };
 
-export const getAthlete = async (req: express.Request, resp: express.Response): Promise<express.Response> => {
-    const userId = req.params.user_id;
-    resp.setHeader("Content-Type", "application/json");
-    const athlete = await getData("athlete", `user_id=${userId}`);
-    if (athlete.data) {
-        resp.status(200);
-        return Promise.resolve(resp.json(athlete.data));
-    } else {
-        resp.status(athlete.status);
-        return Promise.resolve(resp.json({ error: athlete.error }));
-    }
-};
-
-export const getAthleteActivities = async (req: express.Request, resp: express.Response): Promise<express.Response> => {
-    const userId = req.params.user_id;
-    resp.setHeader("Content-Type", "application/json");
-    const activities = await getData("activity", `user_id=${userId}`);
-    if (activities.data) {
-        resp.status(200);
-        return Promise.resolve(resp.json(activities.data));
-    } else {
-        resp.status(activities.status);
-        return Promise.resolve(resp.json({ error: activities.error }));
-    }
-};
-
-const fetchStoreAthlete = (stravaT: string, user_id?: string): Promise<any> => {
-    let userId = user_id;
-    if (!userId) {
-        userId = setUserId(stravaT);
-    }
+const fetchAndStoreAthlete = (stravaToken: string, user_id: string): Promise<any> => {
     const athleteUrl = `${config.strava.apiUrl}athlete`;
     return new Promise((resolve, reject) => {
-        axios.get(athleteUrl, { headers: { Authorization: `Bearer ${stravaT}` }}).then(resp => {
+        axios.get(athleteUrl, { headers: { Authorization: `Bearer ${stravaToken}` }}).then(resp => {
             // store resp
-            console.log(`Athlete: ${JSON.stringify(resp.data)}`);
-            const athlete = { athlete: resp.data, user_id };
-            // storeData("athlete", athlete);
-            downloadAthleteActivites(stravaT);
-            resolve(athlete);
+            console.log(`Adding Athlete: ${JSON.stringify(resp.data)} to user ${user_id}`);
+            storeUserData("athlete", user_id, resp.data).then(r => {
+                console.log(`Added athlete ${r.id}, user ${user_id}`)
+                downloadAthleteActivites(stravaToken, user_id);
+                resolve(resp.data);
+            }).catch(e => {
+                console.error(`Failed to add athlete for user ${user_id}`, e);
+                reject(e);
+            });
         }).catch(e => {
             console.error(`Failed to fetch athlete data: ${e.message}`);
             reject(e);
@@ -107,30 +84,20 @@ const fetchStoreAthlete = (stravaT: string, user_id?: string): Promise<any> => {
     });
 };
 
-const downloadAthleteActivites = (stravaTo: string, since?: moment.Moment, user_id?: string) => {
-    let userId = user_id;
-    if (!userId) {
-        userId = setUserId(stravaTo);
+const downloadAthleteActivites = (stravaToken: string, user_id: string, since?: moment.Moment) => {
+    let activityUrl = `${config.strava.apiUrl}athlete/activities`;
+    if (since) {
+        activityUrl = `${activityUrl}?after=${since.toISOString()}`;
     }
-    if (user_id) {
-        let activityUrl = `${config.strava.apiUrl}athlete/activities`;
-        if (since) {
-            activityUrl = `${activityUrl}?after=${since.toISOString()}`;
-        }
-        axios.get(activityUrl, { headers: { Authorization: `Bearer ${stravaTo}` }}).then(resp => {
-            resp.data.forEach((activity: any) => {
-                // storeData("activity", { activity, user_id });
+    axios.get(activityUrl, { headers: { Authorization: `Bearer ${stravaToken}` }}).then(resp => {
+        resp.data.forEach((activity: any) => {
+            storeUserData("activity", user_id, activity).then(r => {
+                console.log(`Added activity ${r.id} for user ${user_id}`);
+            }).catch(e => {
+                console.error(`Failed to add activity for user ${user_id}`, e);
             });
-        }).catch(e => {
-            console.error(`Failed to fetch athlete activities: ${e.message}`);
         });
-    }
+    }).catch(e => {
+        console.error(`Failed to fetch athlete activities: ${e.message}`);
+    });
 };
-
-const setUserId = (stravaToken: string): any => {
-    const u = getData("token", `token=${stravaToken}`);
-    if (u.data) {
-        return getData("token", `token=${stravaToken}`).data.user_id;
-    }
-    return null;
-}

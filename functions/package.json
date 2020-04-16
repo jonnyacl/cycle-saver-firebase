@@ -2,6 +2,7 @@
   "name": "cycle-saver-functions",
   "description": "Authenticated Endpoints for cycle saver app",
   "dependencies": {
+    "@google-cloud/firestore": "^3.7.4",
     "axios": "^0.19.1",
     "cors": "^2.8.1",
     "express": "^4.14.1",
