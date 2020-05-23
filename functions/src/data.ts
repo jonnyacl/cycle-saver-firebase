@@ -8,16 +8,16 @@ const firestore = new fStore.Firestore({
 });
 
 export const storeUserData = async (tableName: string, userId: string, data: any): Promise<fStore.DocumentReference> => {
-    console.log(`Storing ${JSON.stringify(data)} into ${tableName} for user ${userId}`);
     const collection = firestore.collection(tableName);
     data.userId = userId;
+    console.log(`Adding new entry ${data.id ? data.id : ''} to ${collection.id} for user ${userId}`);
     return collection.add(data);
 };
 
 export const getUserData = (tableName: string, userId: string): Promise<any> => {
     return new Promise((resolve, reject) => {
         const collection = firestore.collection(tableName);
-        console.log(`Fetching ${tableName} for user ${userId}`);
+        console.log(`Fetching ${collection.id} for user ${userId}`);
         collection.where('userId', '==', userId).get().then(snapshot => {
             if (snapshot.empty) {
                 console.log(`Unable to find the document ${userId} from ${tableName}`);
@@ -32,12 +32,12 @@ export const getUserData = (tableName: string, userId: string): Promise<any> => 
         }).catch(e => {
             console.error(e);
             reject({ status: 404, error: `Unable to retrieve the document ${userId} from ${tableName}`});
-        })
+        }); 
     });
 };
 
 export const storeStravaToken = async (userId: string, token: any): Promise<fStore.WriteResult> => {
-    console.log(`Storing ${JSON.stringify(token)} into stravatokens for user ${userId}`);
     const collection = firestore.collection('stravatokens');
+    console.log(`Storing ${JSON.stringify(token)} into ${collection.id} for user ${userId}`);
     return collection.doc(userId).set(token);
 };

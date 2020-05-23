@@ -29,7 +29,7 @@
     "init": "node initConfig.js"
   },
   "engines": {
-    "node": "8"
+    "node": "11"
   },
   "main": "lib/index.js",
   "private": true

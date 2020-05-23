@@ -5,7 +5,7 @@ export const getAthlete = async (req: express.Request, resp: express.Response): 
     const userId = req.params.user;
     resp.setHeader("Content-Type", "application/json");
     try {
-        const athlete = await getUserData("athlete", userId);
+        const athlete = await getUserData("athletes", userId);
         resp.status(200);
         return Promise.resolve(resp.json(athlete));
     } catch(e) {
