@@ -40,11 +40,18 @@ export const obtainStravaToken = async (req: express.Request, resp: express.Resp
             code: body.code,
             grant_type: "authorization_code"
         };
-        const stravaResp = await axios.post(tokenUrl, stravaBody);
+        let stravaResp;
+        try {
+            stravaResp = await axios.post(tokenUrl, stravaBody);
+        } catch(e) {
+            console.error('Failed to obtain strava token', e);
+            resp.status(502);
+            return Promise.resolve(resp.json({ "error": "Failed to connect strava" }));
+        }
         if (stravaResp.status === 200 || stravaResp.status === 201) {
             // store token and async request the athlete's profile and activities
             console.log(`Strava token: ${JSON.stringify(stravaResp)}`);
-            await storeStravaToken(body.user_id, stravaResp.data);
+            storeStravaToken(body.user_id, stravaResp.data);
             fetchAndStoreAthlete(stravaResp.data.access_token, body.user_id).then(athlete => {
                 resp.status(201);
                 return Promise.resolve(resp.json(athlete));

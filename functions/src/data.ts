@@ -20,6 +20,7 @@ export const getUserData = (tableName: string, userId: string): Promise<any> => 
         console.log(`Fetching ${tableName} for user ${userId}`);
         collection.where('userId', '==', userId).get().then(snapshot => {
             if (snapshot.empty) {
+                console.log(`Unable to find the document ${userId} from ${tableName}`);
                 reject({ status: 404, error: `Unable to find the document ${userId} from ${tableName}` });
             } else {
                 const userData: fStore.DocumentData[] = [];
