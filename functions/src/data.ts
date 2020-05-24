@@ -36,6 +36,23 @@ export const getUserData = (tableName: string, userId: string): Promise<any> => 
     });
 };
 
+export const getUserToken = (type: string, userId: string): Promise<any> => {
+    return new Promise((resolve, reject) => {
+        const collection = firestore.collection(`${type}tokens`);
+        console.log(`Fetching ${collection.id} for user ${userId}`);
+        collection.doc(userId).get().then(token => {
+            const tokenData = token.data();
+            if (tokenData) {
+                resolve(tokenData);
+            }
+            reject({ status: 403, error: `Unable to find ${type}token for user ${userId}` });
+        }).catch(e => {
+            console.error(e);
+            reject({ status: 403, error: `Unable to retrieve ${type}token for user ${userId}` });
+        });
+    });
+};
+
 export const storeStravaToken = async (userId: string, token: any): Promise<fStore.WriteResult> => {
     const collection = firestore.collection('stravatokens');
     console.log(`Storing ${JSON.stringify(token)} into ${collection.id} for user ${userId}`);

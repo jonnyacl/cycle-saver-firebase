@@ -2,7 +2,7 @@ import * as express from "express";
 import config from "./config";
 import axios from "axios";
 import * as moment from "moment";
-import { storeUserData, storeStravaToken } from "./data";
+import { storeUserData, storeStravaToken, getUserToken } from "./data";
 
 export const stravaSignIn = (req: express.Request, resp: express.Response): express.Response => {
     const body = req.body;
@@ -21,6 +21,39 @@ export const stravaSignIn = (req: express.Request, resp: express.Response): expr
     }
     resp.status(400);
     return resp.json({ "error": "Invalid env param" });
+};
+
+export const stravaDisconnect = async (req: express.Request, resp: express.Response): Promise<express.Response> => {
+    const userId = req.params.user;
+    resp.setHeader("Content-Type", "application/json");
+    try {
+        const stravaToken = await getUserToken("strava", userId);
+        if (stravaToken.access_token) {
+            const deAuthUrl = `https://www.strava.com/oauth/deauthorize?access_token=${stravaToken.access_token}`;
+            const deAuthResp = await axios.post(deAuthUrl);
+            if (deAuthResp.status === 201) {
+                console.log(`Revoked Strava access for user ${userId}`);
+                resp.status(201);
+                return resp.json({});
+            } else {
+                console.error(`Failed to revoke Strava access for user ${userId}`);
+                resp.status(deAuthResp.status);
+                return resp.json({});
+            }
+        }
+        resp.status(500);
+        return resp.json({});
+    } catch(e) {
+        if (e.status) {
+            resp.status(e.status);
+        } else if (e.response && e.response.status) {
+            console.error(`Failed to revoke Strava access for user ${userId}`, e.response.data);
+            resp.status(e.response.status);
+        } else {
+            resp.status(500);
+        }
+        return resp.json({});
+    }
 };
 
 export const obtainStravaToken = async (req: express.Request, resp: express.Response): Promise<express.Response> => {
@@ -81,7 +114,9 @@ const fetchAndStoreAthlete = async (stravaToken: string, user_id: string): Promi
     return new Promise((resolve, reject) => {
         axios.get(athleteUrl, { headers: { Authorization: `Bearer ${stravaToken}` }}).then(resp => {
             // store resp
-            storeUserData("athletes", user_id, resp.data).then(r => {
+            let athlete = resp.data;
+            athlete.connected = moment().toISOString();
+            storeUserData("athletes", user_id, athlete).then(r => {
                 console.log(`Added athlete ${r.id}, user ${user_id}`)
                 downloadAthleteActivites(stravaToken, user_id);
                 resolve(resp.data);

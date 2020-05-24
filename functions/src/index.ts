@@ -1,7 +1,7 @@
 import * as express from "express";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { stravaSignIn, obtainStravaToken } from "./strava";
+import { stravaSignIn, obtainStravaToken, stravaDisconnect } from "./strava";
 import { getAthlete, getActivities } from "./user";
 admin.initializeApp();
 
@@ -45,6 +45,10 @@ app.use(express.json());
 
 app.post("/strava/oauth", (req, resp) => {
   stravaSignIn(req, resp);
+});
+
+app.post("/:user/strava/deauthorize", async (req, resp) => {
+  await stravaDisconnect(req, resp);
 });
 
 app.post("/strava/token", async (req, resp) => {
