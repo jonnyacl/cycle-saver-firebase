@@ -33,8 +33,9 @@ const validateFirebaseIdToken = async (req: express.Request, res: express.Respon
 };
 
 const logRoute = async (req: express.Request, res: express.Response, next: Function) => {
-  console.log('REQ =>', req.params);
+  console.log('REQ ===>', req);
   next();
+  console.log('RES <===', res);
   return;
 };
 
